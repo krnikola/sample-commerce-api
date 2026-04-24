@@ -18,36 +18,62 @@ public class DummyJsonProductClient : IProductClient
         string? sortBy = null,
         string? sortDir = "asc")
     {
+        // Ako nema sortiranja, zadrži jednostavan i jeftin put
+        if (string.IsNullOrWhiteSpace(sortBy))
+        {
+            return await _http.GetFromJsonAsync<ProductsResponse>($"products?skip={skip}&limit={limit}");
+        }
 
-        var result = await _http.GetFromJsonAsync<ProductsResponse>($"products?skip={skip}&limit={limit}");
+        // 1) Prvo dohvatimo mali payload da saznamo ukupan broj proizvoda
+        var metadata = await _http.GetFromJsonAsync<ProductsResponse>("products?skip=0&limit=1");
+        if (metadata?.Products is null)
+            return metadata;
 
-        if (result?.Products is null || string.IsNullOrWhiteSpace(sortBy))
-            return result;
+        var total = metadata.Total;
 
+        // 2) Dohvatimo sve proizvode
+        var allProductsResponse = await _http.GetFromJsonAsync<ProductsResponse>($"products?skip=0&limit={total}");
+        if (allProductsResponse?.Products is null)
+            return allProductsResponse;
+
+        var products = allProductsResponse.Products;
         var desc = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
 
-        result.Products = sortBy.ToLower() switch
+        // 3) Globalno sortiranje
+        products = sortBy.ToLower() switch
         {
             "title" => desc
-                ? result.Products.OrderByDescending(p => p.Title).ToList()
-                : result.Products.OrderBy(p => p.Title).ToList(),
+                ? products.OrderByDescending(p => p.Title).ToList()
+                : products.OrderBy(p => p.Title).ToList(),
 
             "price" => desc
-                ? result.Products.OrderByDescending(p => p.Price).ToList()
-                : result.Products.OrderBy(p => p.Price).ToList(),
+                ? products.OrderByDescending(p => p.Price).ToList()
+                : products.OrderBy(p => p.Price).ToList(),
 
             "rating" => desc
-                ? result.Products.OrderByDescending(p => p.Rating).ToList()
-                : result.Products.OrderBy(p => p.Rating).ToList(),
+                ? products.OrderByDescending(p => p.Rating).ToList()
+                : products.OrderBy(p => p.Rating).ToList(),
 
             "stock" => desc
-                ? result.Products.OrderByDescending(p => p.Stock).ToList()
-                : result.Products.OrderBy(p => p.Stock).ToList(),
+                ? products.OrderByDescending(p => p.Stock).ToList()
+                : products.OrderBy(p => p.Stock).ToList(),
 
-            _ => result.Products
+            _ => products
         };
 
-        return result;
+        // 4) Tek nakon sortiranja radimo paginaciju
+        var pagedProducts = products
+            .Skip(skip)
+            .Take(limit)
+            .ToList();
+
+        return new ProductsResponse
+        {
+            Products = pagedProducts,
+            Total = total,
+            Skip = skip,
+            Limit = limit
+        };
     }
 
     public async Task<ProductDto?> GetProductAsync(int id)

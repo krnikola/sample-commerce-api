@@ -86,7 +86,7 @@ After startup, Swagger UI should be available at:
 ## Notes
 - Product catalog data is fetched from DummyJSON and is not stored locally.
 - Favorites and basket data are persisted in SQL Server.
-- Product list sorting is currently applied to the fetched result set for the requested page.
+- Product list sorting is applied before pagination for supported sort fields.
 - Repeated product requests are cached temporarily to reduce calls to the external API.
 
 ## Possible Future Improvements
